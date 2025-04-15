@@ -3,6 +3,7 @@
  import Login from '../screen/login'
  import Register from '../screen/Register'
 import Home from '../screen/Home'
+import Project from '../screen/Project'
 
  const AppRoutes = () => {
    return (
@@ -12,6 +13,8 @@ import Home from '../screen/Home'
             <Route path='/' element={<Home />} />
             <Route path='/login' element={<Login />} />
             <Route path='/register' element={<Register />} />
+            <Route path='/project' element={<Project />} />
+            
         </Routes>
      </BrowserRouter>
    )
