@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from '../config/axios';
 import { initializeSocket, recieveMessages, sendMessage } from '../config/socket';
@@ -14,7 +14,8 @@ const Project = () => {
   const [project, setProject] = useState(location.state.project);
   const [message,  setMessage] = useState('')
   const { user } = useContext(UserContext)
-  const messageBox = React.createRef()
+  const messageBox = useRef(null)
+
 
 
   const [users, setUsers] = useState([])
@@ -55,7 +56,16 @@ const Project = () => {
        appendOutgoingMessage(message)
 
        setMessage("")
+
   }
+
+  const scrollToBottom = () => {
+    const box = messageBox.current;
+    if (box) {
+      box.scrollTop = box.scrollHeight;
+    }
+  };
+  
 
   useEffect(() => {
 
@@ -90,6 +100,7 @@ const Project = () => {
                             <p class="text-sm">${messageObject.message}</p>
                         `
     messageBox.appendChild(message)
+    scrollToBottom();
 
   }
   
@@ -104,6 +115,7 @@ const Project = () => {
                             <p class="text-sm">${message}</p>
                         `
     messageBox.appendChild(newMessage)
+    scrollToBottom();
 
   } 
   
@@ -133,12 +145,11 @@ const Project = () => {
 
         {/* Chat area */}
         <div className='conversation-area flex-grow flex flex-col p-4 overflow-hidden'>
-            <div
-              ref={messageBox}
-              className='message-box flex flex-col gap-1.5 overflow-y-auto no-scrollbar h-full'>
+        <div
+          ref={messageBox}
+          className='message-box flex flex-col gap-1.5 overflow-y-auto no-scrollbar h-full'>
+        </div>
 
-            
-            </div>
 
           {/* Input */}
           <div className='inputField w-full flex items-center gap-2 mt-3'>
