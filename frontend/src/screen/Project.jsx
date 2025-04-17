@@ -14,6 +14,7 @@ const Project = () => {
   const [project, setProject] = useState(location.state.project);
   const [message,  setMessage] = useState('')
   const { user } = useContext(UserContext)
+  const messageBox = React.createRef()
 
 
   const [users, setUsers] = useState([])
@@ -44,10 +45,14 @@ const Project = () => {
   }
 
   const send = () =>{
+
+
       sendMessage('project-message', { 
         message,
-        sender: user._id
+        sender: user.email
        })
+
+       appendOutgoingMessage(message)
 
        setMessage("")
   }
@@ -58,6 +63,7 @@ const Project = () => {
 
     recieveMessages('project-message', data => {
       console.log(data)
+      appendIncomingMessage(data)
     })
 
     
@@ -72,6 +78,35 @@ const Project = () => {
         console.error(err)
     })
   }, [])
+
+  function appendIncomingMessage(messageObject){
+
+    const messageBox = document.querySelector('.message-box')
+
+    const message = document.createElement('div')
+    message.classList.add('message', 'max-w-56', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-lg')
+    message.innerHTML = `
+                            <small class="opacity-65 text-xs">${messageObject.sender}</small>
+                            <p class="text-sm">${messageObject.message}</p>
+                        `
+    messageBox.appendChild(message)
+
+  }
+  
+  function appendOutgoingMessage(message){
+
+    const messageBox = document.querySelector('.message-box')
+
+    const newMessage = document.createElement('div')
+    newMessage.classList.add('ml-auto', 'max-w-56', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-lg')
+    newMessage.innerHTML = `
+                            <small class="opacity-65 text-xs">${user.email}</small>
+                            <p class="text-sm">${message}</p>
+                        `
+    messageBox.appendChild(newMessage)
+
+  } 
+  
 
   return (
     <main className='h-screen w-screen flex'>
@@ -97,35 +132,37 @@ const Project = () => {
         </header>
 
         {/* Chat area */}
-        <div className='conversation-area flex-grow flex flex-col p-4'>
-          <div className='message-box p-1 flex-grow flex flex-col gap-1.5'>
-            <div className='message max-w-56 flex flex-col p-2 bg-slate-50 w-fit rounded-lg'>
-              <small className='opacity-65 text-xs'>example@gmail.com</small>
-              <p className='text-sm'>Lorem ipsum dolor sit amet.</p>
-            </div>
+        <div className='conversation-area flex-grow flex flex-col p-4 overflow-hidden'>
+            <div
+              ref={messageBox}
+              className='message-box flex flex-col gap-1.5 overflow-y-auto no-scrollbar h-full'>
 
-            <div className='ml-auto max-w-56 message flex flex-col p-2 bg-slate-50 w-fit rounded-lg'>
-              <small className='opacity-65 text-xs'>example@gmail.com</small>
-              <p className='text-sm'>Lorem ipsum dolor sit amet.</p>
+            
             </div>
-          </div>
 
           {/* Input */}
           <div className='inputField w-full flex items-center gap-2 mt-3'>
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  send();
+                }
+              }}
               className='flex-grow p-2 px-4 rounded-full bg-slate-50 text-slate-800 placeholder-slate-400 border border-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition'
               type='text'
               placeholder='Enter message'
             />
             <button
-            onClick={send}
-            className='p-3 rounded-full bg-slate-600 text-white hover:bg-slate-700 transition-colors'>
+              onClick={send}
+              className='p-3 rounded-full bg-slate-600 text-white hover:bg-slate-700 transition-colors'>
               <i className='ri-send-plane-fill'></i>
             </button>
           </div>
         </div>
+
 
         {/* Slide Panel */}
         <div

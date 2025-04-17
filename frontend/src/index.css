@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Your custom CSS (like no-scrollbar) goes below */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
