@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* Your custom CSS (like no-scrollbar) goes below */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
   }

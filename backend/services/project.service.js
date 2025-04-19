@@ -113,3 +113,6 @@ export const getProjectById = async ({ projectId }) => {
 
     return project
 }
+
+// we used services folder as if in future we want to change dabase or ORM we can just change the service and not the controller
+// everything which is ouside our server, we will code in service folder
