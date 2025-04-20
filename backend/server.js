@@ -64,7 +64,9 @@ io.on('connection', socket => {
     socket.on('project-message',async data =>{
 
         const message = data.message
-        const aiIsPresentInMessage = message.includes('@ai')
+        const aiIsPresentInMessage = message.trim().toLowerCase().startsWith('@ai ') // this expilictly checks for @ai in the message, seperated with a space
+
+        socket.broadcast.to(socket.roomId).emit('project-message',data)   
 
         if(aiIsPresentInMessage){
             const prompt = message.replace('@ai','');
@@ -82,7 +84,7 @@ io.on('connection', socket => {
             return
         }
         console.log(data)
-        socket.broadcast.to(socket.roomId).emit('project-message',data)   
+       
     })
     socket.on('disconnect', () => { /* … */ });
 });

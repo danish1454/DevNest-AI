@@ -13,12 +13,39 @@ const Project = () => {
   const [selectedUserId, setSelectedUserId] = useState([]);
   const [project, setProject] = useState(location.state.project);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]); // 👈 NEW: message state
+  const [messages, setMessages] = useState([]); 
   const { user } = useContext(UserContext);
   const messageBox = useRef(null);
 
-  const [users, setUsers] = useState([]);
+  const [ fileTree, setFileTree ] = useState({
+    "app.js": {
+        content: `const express = require('express');`
+    },
+    "package.json": {
+        content: `{
+                    "name": "temp-server",
+                    }`
+    }
+})
 
+const [ currentFile, setCurrentFile ] = useState(null)
+const [ openFiles, setOpenFiles ] = useState([])
+const [users, setUsers] = useState([]);
+  
+
+  function SyntaxHighlightedCode(props){
+    const ref = useRef(null);
+    useEffect(() => {
+      if (ref.current && props.className?.includes('lang-') && window.hljs) {
+        window.hljs.highlightElement(ref.current);
+
+        ref.current.removeAttribute('data-highlighted');
+      }
+  }, [props.className, props.children])
+
+    return <code {...props} ref={ref} />
+  }
+  
   const handleUserClick = (id) => {
     setSelectedUserId((prevSelectedId) => {
       const newSelectedUserId = new Set(prevSelectedId);
@@ -46,7 +73,7 @@ const Project = () => {
       });
   }
 
-  // 👇 NEW: Sending message
+  // Sending message
   const send = () => {
     const outgoingMessage = {
       message,
@@ -58,7 +85,7 @@ const Project = () => {
     setMessage('');
   };
 
-  // 👇 Scroll to bottom
+  //  Scroll to bottom
   const scrollToBottom = () => {
     const box = messageBox.current;
     if (box) {
@@ -104,9 +131,9 @@ const Project = () => {
           </button>
         </header>
 
-        {/* 👇 Chat Area */}
+        {/* Chat Area */}
         <div className="conversation-area flex-grow flex flex-col p-4 overflow-hidden">
-        <div ref={messageBox} className="message-box flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden no-scrollbar h-full">
+         <div ref={messageBox} className="message-box flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden no-scrollbar h-full">
 
             {messages.map((msg, index) => (
               <div
@@ -119,7 +146,18 @@ const Project = () => {
                 <div className="text-sm">
                   {msg.sender._id === 'ai' ? 
                       <div className='overflow-auto bg-slate-950 text-white p-2 rounded-lg'>
-                          <Markdown>{msg.message}</Markdown> 
+                          <Markdown
+                            options={{
+                              overrides: {
+                                code: {
+                                  component: SyntaxHighlightedCode,
+                                },
+                              },
+                            }}
+                              >
+                                {msg.message}
+                          </Markdown>
+ 
                       </div>
                   : msg.message}
                 </div>
@@ -174,53 +212,117 @@ const Project = () => {
                 </div>
               ))}
           </div>
-        </div>
+         </div>
 
-        {/* 👇 Collaborator Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/10 backdrop-blur-sm flex justify-center items-center p-4">
-            <div className="bg-white/70 backdrop-blur-md w-full max-w-md rounded-2xl shadow-xl border border-slate-200 ring-1 ring-slate-300/20 flex flex-col relative">
-              <header className="flex justify-between items-center p-5 border-b border-slate-300/40 bg-white/60 rounded-t-2xl">
-                <h2 className="text-xl font-semibold text-slate-800">Select Collaborators</h2>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-2xl text-slate-600 hover:text-slate-800 transition"
-                >
-                  <i className="ri-close-line"></i>
-                </button>
-              </header>
-
-              <div className="users flex flex-col gap-3 p-4 max-h-96 overflow-y-auto">
-                {users.map((user) => (
-                  <div
-                    key={user._id}
-                    onClick={() => handleUserClick(user._id)}
-                    className={`cursor-pointer p-3 px-4 rounded-xl flex items-center gap-3 border border-slate-200/70 bg-white/50 shadow-sm hover:shadow-md hover:bg-white transition ${
-                      Array.from(selectedUserId).includes(user._id)
-                        ? 'bg-slate-100 ring-2 ring-slate-400/50'
-                        : ''
-                    }`}
+          {/* 👇 Collaborator Modal */}
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/10 backdrop-blur-sm flex justify-center items-center p-4">
+              <div className="bg-white/70 backdrop-blur-md w-full max-w-md rounded-2xl shadow-xl border border-slate-200 ring-1 ring-slate-300/20 flex flex-col relative">
+                <header className="flex justify-between items-center p-5 border-b border-slate-300/40 bg-white/60 rounded-t-2xl">
+                  <h2 className="text-xl font-semibold text-slate-800">Select Collaborators</h2>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="text-2xl text-slate-600 hover:text-slate-800 transition"
                   >
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-700 text-white text-lg">
-                      <i className="ri-user-fill"></i>
-                    </div>
-                    <span className="font-medium text-slate-800">{user.email}</span>
-                  </div>
-                ))}
-              </div>
+                    <i className="ri-close-line"></i>
+                  </button>
+                </header>
 
-              <div className="p-4 border-t border-slate-300/40 bg-white/60 rounded-b-2xl">
-                <button
-                  className="w-full px-6 py-3 bg-slate-700 text-white rounded-full hover:bg-slate-800 transition shadow-md"
-                  onClick={addCollaborators}
-                >
-                  Add Collaborators
-                </button>
+                <div className="users flex flex-col gap-3 p-4 max-h-96 overflow-y-auto">
+                  {users.map((user) => (
+                    <div
+                      key={user._id}
+                      onClick={() => handleUserClick(user._id)}
+                      className={`cursor-pointer p-3 px-4 rounded-xl flex items-center gap-3 border border-slate-200/70 bg-white/50 shadow-sm hover:shadow-md hover:bg-white transition ${
+                        Array.from(selectedUserId).includes(user._id)
+                          ? 'bg-slate-100 ring-2 ring-slate-400/50'
+                          : ''
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-700 text-white text-lg">
+                        <i className="ri-user-fill"></i>
+                      </div>
+                      <span className="font-medium text-slate-800">{user.email}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 border-t border-slate-300/40 bg-white/60 rounded-b-2xl">
+                  <button
+                    className="w-full px-6 py-3 bg-slate-700 text-white rounded-full hover:bg-slate-800 transition shadow-md"
+                    onClick={addCollaborators}
+                  >
+                    Add Collaborators
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+          </section>
+
+          <section className="right bg-red-50 flex-grow h-full flex">
+              
+            <div className="explorer h-full max-w-64 min-w-52 bg-slate-200">
+                <div className="file-tree w-full">
+                    {
+                        Object.keys(fileTree).map((file, index) => (
+                            <button
+                                onClick={() => {
+                                    setCurrentFile(file)
+                                    setOpenFiles([ ...new Set([ ...openFiles, file ]) ])
+                                }}
+                                className="tree-element cursor-pointer p-2 px-4 flex items-center gap-2 bg-slate-300 w-full">
+                                <p
+                                    className='font-semibold text-lg'
+                                >{file}</p>
+                            </button>))
+
+                    }
+                </div>
+
+            </div>
+
+            {currentFile && (
+                <div className="code-editor flex flex-col flex-grow h-full">
+
+                    <div className="top flex">
+                        {
+                            openFiles.map((file, index) => (
+                                <button
+                                    onClick={() => setCurrentFile(file)}
+                                    className={`open-file cursor-pointer p-2 px-4 flex items-center w-fit gap-2 bg-slate-300 ${currentFile === file ? 'bg-slate-400' : ''}`}>
+                                    <p
+                                        className='font-semibold text-lg'
+                                    >{file}</p>
+                                </button>
+                            ))
+                        }
+                    </div>
+                    <div className="bottom flex flex-grow">
+                        {
+                            fileTree[ currentFile ] && (
+                                <textarea
+                                    value={fileTree[ currentFile ].content}
+                                    onChange={(e) => {
+                                        setFileTree({
+                                            ...fileTree,
+                                            [ currentFile ]: {
+                                                content: e.target.value
+                                            }
+                                        })
+                                    }}
+                                    className='w-full h-full p-4 bg-slate-50 outline-none border-none'
+                                ></textarea>
+                            )
+                        }
+                    </div>
+
+                </div>
+            )}
+
+            </section>
+
+
     </main>
   );
 };
