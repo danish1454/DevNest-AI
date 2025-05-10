@@ -61,31 +61,33 @@ io.on('connection', socket => {
     console.log('a user connected');
     socket.join(socket.roomId)
 
-    socket.on('project-message',async data =>{
-
-        const message = data.message
-        const aiIsPresentInMessage = message.trim().toLowerCase().startsWith('@ai ') // this expilictly checks for @ai in the message, seperated with a space
-
-        socket.broadcast.to(socket.roomId).emit('project-message',data)   
-
-        if(aiIsPresentInMessage){
-            const prompt = message.replace('@ai','');
-            const result = await generateResult(prompt)
-
-            io.to(socket.roomId).emit('project-message', { // io.to emit is used so that the resonse is sent to everyone in the room
-                message: result,
-                sender: {
-                    _id: 'ai',
-                    email: 'AI',
-                },
-                ai: true
-            })
-            
-            return
+    socket.on('project-message', async data => {
+        const message = data.message;
+        const aiIsPresentInMessage = message.trim().toLowerCase().startsWith('@ai ');
+      
+        socket.broadcast.to(socket.roomId).emit('project-message', data);
+      
+        if (aiIsPresentInMessage) {
+          const prompt = message.replace('@ai', '');
+          const result = await generateResult(prompt);
+      
+          io.to(socket.roomId).emit('project-message', {
+            message: result,
+            sender: {
+              _id: 'ai',
+              email: 'AI',
+            },
+            ai: true,
+            originalPrompt: prompt,              
+            promptUser: data.sender.email        
+          });
+      
+          return;
         }
-        console.log(data)
-       
-    })
+      
+        console.log(data);
+      });
+      
     socket.on('disconnect', () => { /* … */ });
 });
 

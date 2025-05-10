@@ -4,48 +4,25 @@ import axios from '../config/axios';
 import { initializeSocket, recieveMessages, sendMessage } from '../config/socket';
 import { UserContext } from '../context/user.context';
 import Markdown from 'markdown-to-jsx';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
 
 const Project = () => {
   const location = useLocation();
 
   const [isSidePanelOpen, setisSidePanelOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState([]);
-  const [project, setProject] = useState(location.state.project);
+  const [selectedUserId, setSelectedUserId] = useState(new Set());
+  const [project, setProject] = useState(location.state?.project);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]); 
+  const [messages, setMessages] = useState([]);
+  const [aiResponses, setAiResponses] = useState([]);
+  const [isAiResponding, setIsAiResponding] = useState(false);
   const { user } = useContext(UserContext);
   const messageBox = useRef(null);
+  const aiBox = useRef(null);
+  const [users, setUsers] = useState([]);
 
-  const [ fileTree, setFileTree ] = useState({
-    "app.js": {
-        content: `const express = require('express');`
-    },
-    "package.json": {
-        content: `{
-                    "name": "temp-server",
-                    }`
-    }
-})
-
-const [ currentFile, setCurrentFile ] = useState(null)
-const [ openFiles, setOpenFiles ] = useState([])
-const [users, setUsers] = useState([]);
-  
-
-  function SyntaxHighlightedCode(props){
-    const ref = useRef(null);
-    useEffect(() => {
-      if (ref.current && props.className?.includes('lang-') && window.hljs) {
-        window.hljs.highlightElement(ref.current);
-
-        ref.current.removeAttribute('data-highlighted');
-      }
-  }, [props.className, props.children])
-
-    return <code {...props} ref={ref} />
-  }
-  
   const handleUserClick = (id) => {
     setSelectedUserId((prevSelectedId) => {
       const newSelectedUserId = new Set(prevSelectedId);
@@ -58,34 +35,37 @@ const [users, setUsers] = useState([]);
     });
   };
 
-  function addCollaborators() {
+  const addCollaborators = () => {
     axios
       .put('/projects/add-user', {
-        projectId: location.state.project._id,
+        projectId: location.state?.project?._id,
         users: Array.from(selectedUserId),
       })
       .then((res) => {
-        console.log(res.data);
         setIsModalOpen(false);
       })
       .catch((err) => {
         console.error(err);
       });
-  }
+  };
 
-  // Sending message
   const send = () => {
+    if (!message.trim()) return;
+    
     const outgoingMessage = {
       message,
       sender: { email: user.email },
     };
+
+    if (message.trim().startsWith('@ai')) {
+      setIsAiResponding(true);
+    }
 
     sendMessage('project-message', outgoingMessage);
     setMessages((prevMessages) => [...prevMessages, outgoingMessage]);
     setMessage('');
   };
 
-  //  Scroll to bottom
   const scrollToBottom = () => {
     const box = messageBox.current;
     if (box) {
@@ -94,15 +74,22 @@ const [users, setUsers] = useState([]);
   };
 
   useEffect(() => {
-    initializeSocket(project._id);
+    if (project?._id) {
+      initializeSocket(project._id);
 
-    recieveMessages('project-message', (data) => {
-      setMessages((prevMessages) => [...prevMessages, data]);
-    });
+      recieveMessages('project-message', (data) => {
+        if (data.sender?._id === 'ai') {
+          setAiResponses((prev) => [...prev, data]);
+          setIsAiResponding(false); 
+        } else {
+          setMessages((prevMessages) => [...prevMessages, data]);
+        }
+      });
 
-    axios.get(`/projects/get-project/${location.state.project._id}`).then((res) => {
-      setProject(res.data.project);
-    });
+      axios.get(`/projects/get-project/${project._id}`).then((res) => {
+        setProject(res.data.project);
+      });
+    }
 
     axios
       .get('/users/all')
@@ -112,217 +99,160 @@ const [users, setUsers] = useState([]);
       .catch((err) => {
         console.error(err);
       });
-  }, []);
+  }, [project?._id]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, aiResponses]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }, 100);
+  }, [aiResponses]);
 
   return (
-    <main className="h-screen w-screen flex">
-      <section className="left relative flex flex-col h-full min-w-72 bg-slate-300">
-        <header className="flex justify-between items-center p-3.5 w-full bg-slate-200 z-10">
-          <button onClick={() => setIsModalOpen(true)} className="flex gap-2 items-center">
-            <i className="ri-user-add-fill"></i>
-            <p>Add collaborator</p>
+    <main className="h-screen w-screen flex text-white bg-[#0f172a] font-sans">
+      <aside className="w-64 bg-[#1e293b] flex flex-col border-r border-slate-700">
+        {/* Sidebar Left */}
+        <header className="p-4 flex justify-between items-center border-b border-slate-700">
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 text-slate-200 hover:text-white transition">
+            <i className="ri-user-add-line"></i>
+            <span className="text-sm">Add</span>
           </button>
-          <button onClick={() => setisSidePanelOpen(!isSidePanelOpen)} className="p-2">
-            <i className="ri-group-fill"></i>
+          <button onClick={() => setisSidePanelOpen(!isSidePanelOpen)} className="p-2 hover:bg-slate-800 rounded-full transition">
+            <i className="ri-group-fill text-lg"></i>
           </button>
         </header>
 
-        {/* Chat Area */}
-        <div className="conversation-area flex-grow flex flex-col p-4 overflow-hidden">
-         <div ref={messageBox} className="message-box flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden no-scrollbar h-full">
-
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`message ${
-                  msg.sender.email === user.email ? 'ml-auto max-w-56' : 'max-w-80'
-                } flex flex-col p-2 bg-slate-50 w-fit rounded-lg`}
-              >
-                <small className="opacity-65 text-xs">{msg.sender.email}</small>
-                <div className="text-sm">
-                  {msg.sender._id === 'ai' ? 
-                      <div className='overflow-auto bg-slate-950 text-white p-2 rounded-lg'>
-                          <Markdown
-                            options={{
-                              overrides: {
-                                code: {
-                                  component: SyntaxHighlightedCode,
-                                },
-                              },
-                            }}
-                              >
-                                {msg.message}
-                          </Markdown>
- 
-                      </div>
-                  : msg.message}
-                </div>
+        <div className={`absolute top-0 left-0 w-64 h-full bg-[#1e293b] shadow-md z-40 transition-transform duration-300 ${isSidePanelOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <header className="p-4 flex justify-between items-center border-b border-slate-600">
+            <h1 className="text-sm font-semibold">Collaborators</h1>
+            <button onClick={() => setisSidePanelOpen(false)} className="p-1 hover:text-red-500">
+              <i className="ri-close-fill text-xl"></i>
+            </button>
+          </header>
+          <div className="p-3 space-y-3">
+            {project?.users?.map((user) => (
+              <div key={user._id} className="flex items-center gap-2 p-2 bg-slate-800/60 rounded-md hover:bg-slate-800 transition">
+                <i className="ri-user-fill text-white bg-slate-600 p-1 rounded-full"></i>
+                <span className="text-sm">{user.email}</span>
               </div>
             ))}
           </div>
+        </div>
+      </aside>
 
-          <div className="inputField w-full flex items-center gap-2 mt-3">
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              className="flex-grow p-2 px-4 rounded-full bg-slate-50 text-slate-800 placeholder-slate-400 border border-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition"
-              type="text"
-              placeholder="Enter message"
-            />
-            <button
-              onClick={send}
-              className="p-3 rounded-full bg-slate-600 text-white hover:bg-slate-700 transition-colors"
+      <section className="flex flex-col flex-grow relative overflow-hidden">
+        <div ref={messageBox}
+          className="flex-grow p-6 space-y-3 overflow-y-auto no-scrollbar bg-gradient-to-b from-slate-800 to-slate-900 max-h-[calc(100vh-8rem)] message-box">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`max-w-md p-3 rounded-xl break-words ${
+                msg.sender?.email === user.email ? "ml-auto bg-blue-600" : "bg-slate-700"
+              }`}
             >
-              <i className="ri-send-plane-fill"></i>
-            </button>
-          </div>
+              <small className="text-xs opacity-70 block mb-1">{msg.sender?.email}</small>
+              <div className="mt-1 text-sm whitespace-pre-wrap overflow-hidden">{msg.message}</div>
+            </div>
+          ))}
         </div>
 
-        {/* 👇 Collaborator Slide Panel */}
-        <div
-          className={`sidePanel absolute top-0 left-0 h-full w-full max-w-xs bg-slate-100 shadow-lg transform transition-transform duration-300 z-20 ${
-            isSidePanelOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <header className="flex justify-between items-center p-4 bg-slate-200">
-            <h1 className="font-semibold text-lg">Collaborators</h1>
-            <button onClick={() => setisSidePanelOpen(false)} className="p-2">
-              <i className="ri-close-fill"></i>
-            </button>
-          </header>
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-11/12 max-w-3xl bg-slate-800/70 backdrop-blur-md p-3 rounded-full flex items-center gap-3 shadow-md border border-slate-700">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="Type your message..."
+            className="flex-grow bg-transparent outline-none text-white placeholder-slate-400 px-3"
+          />
+          <button onClick={send} className="p-2 hover:bg-slate-700 rounded-full transition">
+            <i className="ri-send-plane-2-fill text-lg"></i>
+          </button>
+        </div>
+      </section>
 
-          <div className="users flex flex-col gap-2 p-4">
-            {project.users &&
-              project.users.map((user) => (
-                <div key={user._id} className="user cursor-pointer hover:bg-slate-200 p-2 flex gap-2 items-center">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center p-1 text-white bg-slate-600">
-                    <i className="ri-user-fill"></i>
-                  </div>
-                  <h1 className="font-semibold">{user.email}</h1>
+      <aside className="w-96 bg-[#1e1b4b] border-l border-slate-800 p-4 hidden lg:flex flex-col">
+        <h2 className="text-lg font-semibold mb-2 text-white">🤖 AI Responses</h2>
+        <div ref={aiBox} className="flex flex-col gap-4 overflow-y-auto no-scrollbar max-h-[calc(100vh-5rem)] pr-2">
+          {aiResponses.map((res, index) => (
+            <div key={index} className="bg-slate-800 p-3 rounded-lg border border-violet-500">
+              <div className="text-sm text-violet-300 mb-2">
+                <strong className="block">Prompt by {res.promptUser || user.email}</strong>
+                <span className="block break-words whitespace-pre-wrap">{res.originalPrompt || ''}</span>
+              </div>
+              <div className="prose max-w-full break-words">
+                <Markdown
+                  options={{
+                    overrides: {
+                      pre: {
+                        component: (props) => (
+                          <pre className="overflow-auto max-h-64 rounded-md bg-[#1e293b] p-3 no-scrollbar" {...props} />
+                        ),
+                      },
+                      code: {
+                        component: (props) => (
+                          <code className="hljs whitespace-pre no-scrollbar" {...props} />
+                        ),
+                      },
+                    },
+                  }}
+                >
+                  {res.message}
+                </Markdown>
+              </div>
+            </div>
+          ))}
+          
+          {/* AI is responding indicator */}
+          {isAiResponding && (
+            <div className="bg-slate-800 p-3 rounded-lg border border-violet-500">
+              <div className="flex items-center gap-2 text-violet-300">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse delay-150"></div>
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse delay-300"></div>
                 </div>
-              ))}
-          </div>
-         </div>
-
-          {/* 👇 Collaborator Modal */}
-          {isModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/10 backdrop-blur-sm flex justify-center items-center p-4">
-              <div className="bg-white/70 backdrop-blur-md w-full max-w-md rounded-2xl shadow-xl border border-slate-200 ring-1 ring-slate-300/20 flex flex-col relative">
-                <header className="flex justify-between items-center p-5 border-b border-slate-300/40 bg-white/60 rounded-t-2xl">
-                  <h2 className="text-xl font-semibold text-slate-800">Select Collaborators</h2>
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    className="text-2xl text-slate-600 hover:text-slate-800 transition"
-                  >
-                    <i className="ri-close-line"></i>
-                  </button>
-                </header>
-
-                <div className="users flex flex-col gap-3 p-4 max-h-96 overflow-y-auto">
-                  {users.map((user) => (
-                    <div
-                      key={user._id}
-                      onClick={() => handleUserClick(user._id)}
-                      className={`cursor-pointer p-3 px-4 rounded-xl flex items-center gap-3 border border-slate-200/70 bg-white/50 shadow-sm hover:shadow-md hover:bg-white transition ${
-                        Array.from(selectedUserId).includes(user._id)
-                          ? 'bg-slate-100 ring-2 ring-slate-400/50'
-                          : ''
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-700 text-white text-lg">
-                        <i className="ri-user-fill"></i>
-                      </div>
-                      <span className="font-medium text-slate-800">{user.email}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-4 border-t border-slate-300/40 bg-white/60 rounded-b-2xl">
-                  <button
-                    className="w-full px-6 py-3 bg-slate-700 text-white rounded-full hover:bg-slate-800 transition shadow-md"
-                    onClick={addCollaborators}
-                  >
-                    Add Collaborators
-                  </button>
-                </div>
+                <span className="text-sm">AI is responding...</span>
               </div>
             </div>
           )}
-          </section>
+        </div>
+      </aside>
 
-          <section className="right bg-red-50 flex-grow h-full flex">
-              
-            <div className="explorer h-full max-w-64 min-w-52 bg-slate-200">
-                <div className="file-tree w-full">
-                    {
-                        Object.keys(fileTree).map((file, index) => (
-                            <button
-                                onClick={() => {
-                                    setCurrentFile(file)
-                                    setOpenFiles([ ...new Set([ ...openFiles, file ]) ])
-                                }}
-                                className="tree-element cursor-pointer p-2 px-4 flex items-center gap-2 bg-slate-300 w-full">
-                                <p
-                                    className='font-semibold text-lg'
-                                >{file}</p>
-                            </button>))
-
-                    }
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50">
+          <div className="bg-[#1e293b] w-full max-w-md rounded-2xl p-6 shadow-lg border border-slate-700">
+            <header className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Add Collaborators</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-xl text-slate-300 hover:text-red-400">
+                <i className="ri-close-fill"></i>
+              </button>
+            </header>
+            <div className="space-y-3 max-h-72 overflow-y-auto">
+              {users.map((user) => (
+                <div
+                  key={user._id}
+                  onClick={() => handleUserClick(user._id)}
+                  className={`p-3 flex items-center gap-3 rounded-lg cursor-pointer hover:bg-slate-700 transition ${
+                    selectedUserId.has(user._id) ? "bg-slate-800 ring-2 ring-blue-500" : "bg-slate-700"
+                  }`}
+                >
+                  <i className="ri-user-line text-white text-xl"></i>
+                  <span className="text-sm">{user.email}</span>
                 </div>
-
+              ))}
             </div>
-
-            {currentFile && (
-                <div className="code-editor flex flex-col flex-grow h-full">
-
-                    <div className="top flex">
-                        {
-                            openFiles.map((file, index) => (
-                                <button
-                                    onClick={() => setCurrentFile(file)}
-                                    className={`open-file cursor-pointer p-2 px-4 flex items-center w-fit gap-2 bg-slate-300 ${currentFile === file ? 'bg-slate-400' : ''}`}>
-                                    <p
-                                        className='font-semibold text-lg'
-                                    >{file}</p>
-                                </button>
-                            ))
-                        }
-                    </div>
-                    <div className="bottom flex flex-grow">
-                        {
-                            fileTree[ currentFile ] && (
-                                <textarea
-                                    value={fileTree[ currentFile ].content}
-                                    onChange={(e) => {
-                                        setFileTree({
-                                            ...fileTree,
-                                            [ currentFile ]: {
-                                                content: e.target.value
-                                            }
-                                        })
-                                    }}
-                                    className='w-full h-full p-4 bg-slate-50 outline-none border-none'
-                                ></textarea>
-                            )
-                        }
-                    </div>
-
-                </div>
-            )}
-
-            </section>
-
-
+            <button onClick={addCollaborators} className="w-full mt-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition">
+              Add Selected
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
