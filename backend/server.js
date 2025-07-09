@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import projectModel from './models/project.model.js';
 import DataHandler from 'ioredis/built/DataHandler.js';
-import { send } from 'process';
+
 import { generateResult } from './services/ai.service.js';
 
 const port = process.env.PORT || 3000;
