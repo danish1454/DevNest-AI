@@ -13,8 +13,12 @@ connect();
 const app = express();
 
 
+const allowedOrigin = process.env.FRONTEND_URL;
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigin, // only allow this origin
+  credentials: true,     // if you're using cookies or auth headers
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
