@@ -5,19 +5,25 @@ import userRoutes from './routes/users.routes.js';
 import projectRoutes from './routes/project.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import cookieParser from 'cookie-parser';
-import cors from 'cors'
-
+import cors from 'cors';
 
 connect();
 
 const app = express();
 
 const allowedOrigin = process.env.FRONTEND_URL;
+console.log('Allowed Origin:', allowedOrigin); 
 
 app.use(cors({
-  origin: allowedOrigin, // only allow this origin
-  credentials: true,     // if you're using cookies or auth headers
+  origin: allowedOrigin,
+  credentials: true,
 }));
+
+app.options('*', cors({
+  origin: allowedOrigin,
+  credentials: true,
+}));
+
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,6 +37,4 @@ app.get('/', (req, res) => {
   res.send('Hello World');
 });
 
-export default app; 
-
-
+export default app;
